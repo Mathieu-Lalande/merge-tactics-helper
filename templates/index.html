@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏰 Clash Royale Merge Tactics Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-crown"></i> Clash Royale Merge Tactics Assistant</h1>
+                <div class="game-info">
+                    <div class="elixir-counter">
+                        <i class="fas fa-droplet"></i>
+                        <span id="elixir-count">4</span> Élixir
+                    </div>
+                    <div class="tour-counter">
+                        <i class="fas fa-clock"></i>
+                        <span>Tour <span id="tour-count">1</span></span>
+                    </div>
+                    <div class="plateau-limit-counter">
+                        <i class="fas fa-layer-group"></i>
+                        <span><span id="cartes-plateau-count">0</span>/<span id="max-cartes-plateau">2</span></span>
+                    </div>
+                    <!-- Game Stats (HP et Élixir) -->
+                    <div class="game-stats" id="game-stats" style="display: none;">
+                        <div class="stat-item">
+                            <i class="fas fa-heart"></i> 
+                            <span id="hp-display">10</span> HP
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Configuration Panel -->
+            <div id="config-panel" class="config-panel">
+                <div class="config-step active" id="step-1">
+                    <h2><i class="fas fa-play"></i> Démarrer une nouvelle partie</h2>
+                    <p>Bienvenue dans l'assistant Merge Tactics ! Configurons votre partie.</p>
+                    <button class="btn btn-primary" onclick="startGame()">
+                        <i class="fas fa-rocket"></i> Commencer
+                    </button>
+                </div>
+
+                <div class="config-step" id="step-2">
+                    <h2><i class="fas fa-crown"></i> Choix du Leader</h2>
+                    <p>Sélectionnez votre leader avec ses bonus spéciaux :</p>
+                    <div class="leaders-grid" id="leaders-list"></div>
+                    <div class="config-actions">
+                        <button class="btn btn-primary" onclick="applyLeaderChoice()">
+                            <i class="fas fa-check"></i> Valider le leader
+                        </button>
+                    </div>
+                </div>
+
+                <div class="config-step" id="step-3">
+                    <h2><i class="fas fa-cogs"></i> Modificateur de partie</h2>
+                    <p>Sélectionnez UN modificateur actif pour cette partie :</p>
+                    <div class="modificateurs-grid" id="modificateurs-list"></div>
+                    <div class="config-actions">
+                        <button class="btn btn-secondary" onclick="selectAutoModificateurs()">
+                            <i class="fas fa-magic"></i> Sélection aléatoire
+                        </button>
+                        <button class="btn btn-primary" onclick="applyModificateurs()">
+                            <i class="fas fa-check"></i> Valider
+                        </button>
+                    </div>
+                </div>
+
+                <div class="config-step" id="step-4">
+                    <h2><i class="fas fa-cards-blank"></i> Configuration initiale</h2>
+                    <p>Configurez vos cartes de départ :</p>
+                    <div class="initial-cards">
+                        <div class="card-selector">
+                            <label>Carte de départ :</label>
+                            <select id="initial-card" class="card-select">
+                                <option value="">Choisir une carte...</option>
+                            </select>
+                            <label>Niveau de la carte :</label>
+                            <input type="number" id="initial-level" min="1" max="5" value="1" placeholder="Niveau">
+                        </div>
+                        <div class="elixir-config">
+                            <label>Élixir de départ :</label>
+                            <input type="number" id="initial-elixir" min="0" value="4">
+                        </div>
+                    </div>
+                    <div class="config-actions">
+                        <button class="btn btn-primary" onclick="applyInitialConfig()">
+                            <i class="fas fa-play"></i> Commencer la partie
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Interface -->
+            <div id="game-interface" class="game-interface" style="display: none;">
+                <!-- Game State -->
+                <div class="game-state">
+                    <!-- Leader Info -->
+                    <div class="leader-section">
+                        <h3><i class="fas fa-crown"></i> Leader</h3>
+                        <div id="leader-info" class="leader-display"></div>
+                    </div>
+
+                    <!-- Plateau -->
+                    <div class="plateau-section">
+                        <h3><i class="fas fa-chess-board"></i> Plateau</h3>
+                        <div id="plateau-cards" class="cards-grid"></div>
+                    </div>
+
+                    <!-- Banc -->
+                    <div class="bench-section">
+                        <h3><i class="fas fa-chair"></i> Banc</h3>
+                        <div id="bench-cards" class="cards-grid"></div>
+                    </div>
+
+                    <!-- Bonus Familles -->
+                    <div class="bonus-section">
+                        <h3><i class="fas fa-star"></i> Bonus de Familles</h3>
+                        <div id="bonus-familles" class="bonus-list"></div>
+                    </div>
+
+                    <!-- Plateau de Jeu Hexagonal -->
+                    <div class="game-board-section">
+                        <h3><i class="fas fa-chess-board"></i> Plateau de Jeu</h3>
+                        <div class="battlefield-container">
+                            <!-- Zone adversaire (4 lignes) -->
+                            <div class="enemy-zone">
+                                <h4><i class="fas fa-skull"></i> Zone Adversaire</h4>
+                                <div class="hex-grid enemy-grid">
+                                    <!-- Ligne 4 (la plus éloignée) -->
+                                    <div class="hex-row" data-row="4">
+                                        <div class="hex-cell" data-pos="4-0"></div>
+                                        <div class="hex-cell" data-pos="4-1"></div>
+                                        <div class="hex-cell" data-pos="4-2"></div>
+                                        <div class="hex-cell" data-pos="4-3"></div>
+                                        <div class="hex-cell" data-pos="4-4"></div>
+                                    </div>
+                                    <!-- Ligne 3 -->
+                                    <div class="hex-row" data-row="3">
+                                        <div class="hex-cell" data-pos="3-0"></div>
+                                        <div class="hex-cell" data-pos="3-1"></div>
+                                        <div class="hex-cell" data-pos="3-2"></div>
+                                        <div class="hex-cell" data-pos="3-3"></div>
+                                        <div class="hex-cell" data-pos="3-4"></div>
+                                    </div>
+                                    <!-- Ligne 2 -->
+                                    <div class="hex-row" data-row="2">
+                                        <div class="hex-cell" data-pos="2-0"></div>
+                                        <div class="hex-cell" data-pos="2-1"></div>
+                                        <div class="hex-cell" data-pos="2-2"></div>
+                                        <div class="hex-cell" data-pos="2-3"></div>
+                                        <div class="hex-cell" data-pos="2-4"></div>
+                                    </div>
+                                    <!-- Ligne 1 -->
+                                    <div class="hex-row" data-row="1">
+                                        <div class="hex-cell" data-pos="1-0"></div>
+                                        <div class="hex-cell" data-pos="1-1"></div>
+                                        <div class="hex-cell" data-pos="1-2"></div>
+                                        <div class="hex-cell" data-pos="1-3"></div>
+                                        <div class="hex-cell" data-pos="1-4"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Zone alliée (4 lignes) -->
+                            <div class="ally-zone">
+                                <h4><i class="fas fa-shield"></i> Votre Zone</h4>
+                                <div class="hex-grid ally-grid">
+                                    <!-- Ligne -1 -->
+                                    <div class="hex-row" data-row="-1">
+                                        <div class="hex-cell" data-pos="-1-0"></div>
+                                        <div class="hex-cell" data-pos="-1-1"></div>
+                                        <div class="hex-cell" data-pos="-1-2"></div>
+                                        <div class="hex-cell" data-pos="-1-3"></div>
+                                        <div class="hex-cell" data-pos="-1-4"></div>
+                                    </div>
+                                    <!-- Ligne -2 -->
+                                    <div class="hex-row" data-row="-2">
+                                        <div class="hex-cell" data-pos="-2-0"></div>
+                                        <div class="hex-cell" data-pos="-2-1"></div>
+                                        <div class="hex-cell" data-pos="-2-2"></div>
+                                        <div class="hex-cell" data-pos="-2-3"></div>
+                                        <div class="hex-cell" data-pos="-2-4"></div>
+                                    </div>
+                                    <!-- Ligne -3 -->
+                                    <div class="hex-row" data-row="-3">
+                                        <div class="hex-cell" data-pos="-3-0"></div>
+                                        <div class="hex-cell" data-pos="-3-1"></div>
+                                        <div class="hex-cell" data-pos="-3-2"></div>
+                                        <div class="hex-cell" data-pos="-3-3"></div>
+                                        <div class="hex-cell" data-pos="-3-4"></div>
+                                    </div>
+                                    <!-- Ligne -4 (la plus proche de nous) -->
+                                    <div class="hex-row" data-row="-4">
+                                        <div class="hex-cell" data-pos="-4-0"></div>
+                                        <div class="hex-cell" data-pos="-4-1"></div>
+                                        <div class="hex-cell" data-pos="-4-2"></div>
+                                        <div class="hex-cell" data-pos="-4-3"></div>
+                                        <div class="hex-cell" data-pos="-4-4"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Choix du tour OPTIMISÉ pour vitesse -->
+                <div class="turn-choices">
+                    <!-- Mode achat rapide -->
+                    <div class="quick-buy-section">
+                        <h3><i class="fas fa-bolt"></i> Achat Rapide (30s)</h3>
+                        <div class="quick-cards-grid" id="quick-cards-grid">
+                            <!-- Les cartes communes seront générées ici automatiquement -->
+                        </div>
+                        <div class="quick-actions">
+                            <button class="btn btn-warning" onclick="refreshQuickCards()">
+                                <i class="fas fa-sync"></i> Actualiser
+                            </button>
+                            <button class="btn btn-info" onclick="toggleAdvancedMode()">
+                                <i class="fas fa-cogs"></i> Mode Avancé
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mode avancé (caché par défaut) -->
+                    <div class="advanced-choices" id="advanced-choices" style="display: none;">
+                        <h3><i class="fas fa-hand-pointer"></i> Mode Avancé</h3>
+                        <div class="choices-container">
+                            <div class="choice-input">
+                                <label>Ajouter une option :</label>
+                                <select id="choice-card" class="card-select">
+                                    <option value="">Choisir une carte...</option>
+                                </select>
+                                <input type="number" id="choice-level" min="1" max="5" value="1" placeholder="Niveau">
+                                <button class="btn btn-secondary" onclick="addChoice()">
+                                    <i class="fas fa-plus"></i> Ajouter
+                                </button>
+                            </div>
+                            <div id="current-choices" class="choices-list"></div>
+                            <div class="choice-actions">
+                                <button class="btn btn-primary" onclick="getRecommendations()">
+                                    <i class="fas fa-brain"></i> Analyser
+                                </button>
+                                <button class="btn btn-success" onclick="makeChoice()">
+                                    <i class="fas fa-shopping-cart"></i> Acheter la carte
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                        
+                        <!-- Résultats de bataille -->
+                        <div class="battle-results">
+                            <h4><i class="fas fa-swords"></i> Résultat de bataille</h4>
+                            <div class="battle-buttons">
+                                <button class="btn btn-success" onclick="recordBattleResult(true)">
+                                    <i class="fas fa-trophy"></i> Victoire
+                                </button>
+                                <button class="btn btn-danger" onclick="recordBattleResult(false)">
+                                    <i class="fas fa-skull"></i> Défaite
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recommandations -->
+                <div id="recommendations" class="recommendations"></div>
+            </div>
+        </main>
+
+        <!-- Modals -->
+        <div id="card-library-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-book"></i> Bibliothèque des cartes</h3>
+                    <button class="close-modal" onclick="closeModal('card-library-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div id="card-library" class="card-library"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
