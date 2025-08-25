@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session
 from main import GameSession, BIBLIOTHEQUE_CARTES, MODIFICATEURS_PARTIE, BONUS_FAMILLES, Carte
+from models import db, PlayerAccount, SavedGame, GameStats
 import uuid
 import json
-import uuid
-import json
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'clash_royale_merge_tactics_secret_key'
@@ -892,6 +892,330 @@ def move_to_field():
         'message': message,
         'fusion_effectuee': fusion_effectuee,
         'elixir_gagne': elixir_gagne
+    })
+
+# ===== GESTION DES COMPTES =====
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    """Créer un nouveau compte utilisateur"""
+    data = request.json
+    username = data.get('username', '').strip()
+    email = data.get('email', '').strip()
+    password = data.get('password', '')
+    
+    # Validation des données
+    if not username or len(username) < 3:
+        return jsonify({
+            'success': False,
+            'error': 'Le nom d\'utilisateur doit contenir au moins 3 caractères'
+        })
+    
+    if not email or '@' not in email:
+        return jsonify({
+            'success': False,
+            'error': 'Adresse email invalide'
+        })
+    
+    if not password or len(password) < 6:
+        return jsonify({
+            'success': False,
+            'error': 'Le mot de passe doit contenir au moins 6 caractères'
+        })
+    
+    # Créer le compte
+    if db.create_account(username, email, password):
+        session['username'] = username
+        return jsonify({
+            'success': True,
+            'message': 'Compte créé avec succès!',
+            'username': username
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Ce nom d\'utilisateur ou cette adresse email existe déjà'
+        })
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    """Connecter un utilisateur"""
+    data = request.json
+    username = data.get('username', '').strip()
+    password = data.get('password', '')
+    
+    if not username or not password:
+        return jsonify({
+            'success': False,
+            'error': 'Nom d\'utilisateur et mot de passe requis'
+        })
+    
+    if db.authenticate(username, password):
+        session['username'] = username
+        account = db.get_account(username)
+        return jsonify({
+            'success': True,
+            'message': f'Bienvenue {username}!',
+            'username': username,
+            'account': account.to_dict() if account else None
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Nom d\'utilisateur ou mot de passe incorrect'
+        })
+
+@app.route('/api/logout', methods=['POST'])
+def logout():
+    """Déconnecter un utilisateur"""
+    session.pop('username', None)
+    session.pop('game_id', None)
+    return jsonify({
+        'success': True,
+        'message': 'Déconnexion réussie'
+    })
+
+@app.route('/api/profile')
+def get_profile():
+    """Récupérer le profil de l'utilisateur connecté"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Non connecté'
+        })
+    
+    account = db.get_account(username)
+    if not account:
+        return jsonify({
+            'success': False,
+            'error': 'Compte introuvable'
+        })
+    
+    stats = db.get_user_stats(username)
+    
+    return jsonify({
+        'success': True,
+        'account': account.to_dict(),
+        'stats': stats
+    })
+
+# ===== GESTION DES SAUVEGARDES =====
+
+@app.route('/api/save_game', methods=['POST'])
+def save_game():
+    """Sauvegarder la partie actuelle"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise pour sauvegarder'
+        })
+    
+    session_id = session.get('game_id')
+    if not session_id or session_id not in game_sessions:
+        return jsonify({
+            'success': False,
+            'error': 'Aucune partie active trouvée'
+        })
+    
+    data = request.json
+    game_name = data.get('game_name', '')
+    
+    game_session = game_sessions[session_id]
+    save_id = db.save_game(username, game_session, game_name)
+    
+    return jsonify({
+        'success': True,
+        'message': 'Partie sauvegardée avec succès!',
+        'save_id': save_id
+    })
+
+@app.route('/api/load_game/<save_id>')
+def load_game(save_id):
+    """Charger une partie sauvegardée"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    saved_game = db.load_game(save_id)
+    if not saved_game:
+        return jsonify({
+            'success': False,
+            'error': 'Sauvegarde introuvable'
+        })
+    
+    if saved_game.username != username:
+        return jsonify({
+            'success': False,
+            'error': 'Accès non autorisé à cette sauvegarde'
+        })
+    
+    # Créer une nouvelle session de jeu à partir de la sauvegarde
+    session_id = str(uuid.uuid4())
+    game_session = GameSession()
+    
+    # Restaurer l'état du jeu
+    state = saved_game.game_state
+    game_session.tour = state['tour']
+    game_session.etat.elixir = state['elixir']
+    game_session.etat.hp = state['hp']
+    game_session.modificateurs_actifs = state['modificateurs_actifs']
+    game_session.leader_choisi = state['leader_choisi']
+    game_session.bonus_familles_actifs = state['bonus_familles_actifs']
+    
+    # Restaurer les cartes
+    game_session.etat.main = []
+    for card_data in state['main']:
+        carte = Carte(card_data['nom'], card_data['cout'], card_data['traits'], card_data['niveau'])
+        game_session.etat.main.append(carte)
+    
+    game_session.etat.bench = []
+    for card_data in state['bench']:
+        carte = Carte(card_data['nom'], card_data['cout'], card_data['traits'], card_data['niveau'])
+        game_session.etat.bench.append(carte)
+    
+    # Stocker la session
+    game_sessions[session_id] = game_session
+    session['game_id'] = session_id
+    
+    return jsonify({
+        'success': True,
+        'message': f'Partie "{saved_game.game_name}" chargée!',
+        'session_id': session_id,
+        'game_data': saved_game.to_dict()
+    })
+
+@app.route('/api/saves')
+def get_saves():
+    """Récupérer toutes les sauvegardes de l'utilisateur"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    saves = db.get_user_saves(username)
+    saves_data = [save.to_dict() for save in saves]
+    
+    return jsonify({
+        'success': True,
+        'saves': saves_data
+    })
+
+@app.route('/api/delete_save/<save_id>', methods=['DELETE'])
+def delete_save(save_id):
+    """Supprimer une sauvegarde"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    if db.delete_save(save_id, username):
+        return jsonify({
+            'success': True,
+            'message': 'Sauvegarde supprimée avec succès'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Impossible de supprimer cette sauvegarde'
+        })
+
+@app.route('/api/update_save/<save_id>', methods=['PUT'])
+def update_save(save_id):
+    """Mettre à jour une sauvegarde existante"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    session_id = session.get('game_id')
+    if not session_id or session_id not in game_sessions:
+        return jsonify({
+            'success': False,
+            'error': 'Aucune partie active trouvée'
+        })
+    
+    game_session = game_sessions[session_id]
+    
+    if db.update_save(save_id, game_session, username):
+        return jsonify({
+            'success': True,
+            'message': 'Sauvegarde mise à jour avec succès'
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'error': 'Impossible de mettre à jour cette sauvegarde'
+        })
+
+# ===== GESTION DES STATISTIQUES =====
+
+@app.route('/api/save_game_stats', methods=['POST'])
+def save_game_stats():
+    """Enregistrer les statistiques d'une partie terminée"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    data = request.json
+    stats = GameStats(
+        tour_final=data.get('tour_final', 0),
+        elixir_total_gagne=data.get('elixir_total_gagne', 0),
+        cartes_achetees=data.get('cartes_achetees', 0),
+        fusions_effectuees=data.get('fusions_effectuees', 0),
+        cartes_vendues=data.get('cartes_vendues', 0),
+        bonus_familles_utilises=data.get('bonus_familles_utilises', []),
+        leader_utilise=data.get('leader_utilise', ''),
+        modificateur_utilise=data.get('modificateur_utilise', ''),
+        victoire=data.get('victoire', False),
+        troupes_adverses_restantes=data.get('troupes_adverses_restantes', 0),
+        duree_partie_minutes=data.get('duree_partie_minutes', 0.0)
+    )
+    
+    db.save_game_stats(username, stats)
+    
+    return jsonify({
+        'success': True,
+        'message': 'Statistiques sauvegardées avec succès'
+    })
+
+@app.route('/api/stats')
+def get_stats():
+    """Récupérer les statistiques détaillées de l'utilisateur"""
+    username = session.get('username')
+    if not username:
+        return jsonify({
+            'success': False,
+            'error': 'Connexion requise'
+        })
+    
+    stats = db.get_user_stats(username)
+    
+    return jsonify({
+        'success': True,
+        'stats': stats
+    })
+
+@app.route('/api/check_session')
+def check_session():
+    """Vérifier si l'utilisateur est connecté"""
+    username = session.get('username')
+    return jsonify({
+        'logged_in': username is not None,
+        'username': username
     })
 
 if __name__ == '__main__':

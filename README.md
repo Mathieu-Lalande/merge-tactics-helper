@@ -1,5 +1,3 @@
-# 🏰 Clash Royale Merge Tactics Assistant
-
 Une application web moderne et interactive pour optimiser vos parties de Merge Tactics dans Clash Royale. Interface rapide et intuitive avec système d'achat ultra-rapide pour respecter la limite de 30 secondes par tour.
 
 ## ✨ Fonctionnalités principales
@@ -42,6 +40,12 @@ Une application web moderne et interactive pour optimiser vos parties de Merge T
 
 ## 🎮 Comment utiliser l'application
 
+### 0. Création de compte (optionnel mais recommandé)
+- **Inscription** : Créez un compte avec nom d'utilisateur, email et mot de passe
+- **Connexion** : Connectez-vous pour accéder aux sauvegardes et statistiques
+- **Sauvegarde automatique** : Vos statistiques sont automatiquement sauvegardées
+- **Gestion des parties** : Sauvegardez et rechargez vos parties à tout moment
+
 ### 1. Configuration initiale (une seule fois)
 - **Choisissez votre leader** avec ses bonus spéciaux (fusion, victoire, etc.)
 - **Sélectionnez UN modificateur** de partie parmi 27+ disponibles
@@ -67,7 +71,16 @@ Une application web moderne et interactive pour optimiser vos parties de Merge T
 - **Plateau hexagonal** : Placez vos troupes stratégiquement sur la grille
 - **Gestion des HP** : Suivi des points de vie et conditions de victoire/défaite
 
-### 5. Conseils d'utilisation
+### 5. Fonctionnalités avancées
+- **Drag & Drop** : Glissez vos cartes entre banc et plateau
+- **Fusion manuelle** : Cliquez sur ⚡ pour fusionner 3 cartes identiques
+- **Suppression** : Cliquez sur 🗑️ pour vendre une carte contre de l'élixir
+- **Plateau hexagonal** : Placez vos troupes stratégiquement sur la grille
+- **Gestion des HP** : Suivi des points de vie et conditions de victoire/défaite
+- **Sauvegardes** : Sauvegardez votre partie en cours et rechargez-la plus tard
+- **Statistiques** : Consultez vos performances, taux de victoire, leaders favoris
+
+### 6. Conseils d'utilisation
 - **Utilisez le mode rapide** pour respecter les 30 secondes par tour
 - **Surveillez les bonus de familles** pour optimiser vos achats
 - **Placez vos meilleures cartes sur le plateau** avant le combat
@@ -147,6 +160,15 @@ clashroyale/
 - `POST /api/manual_merge` : Fusionner manuellement
 - `POST /api/delete_card` : Supprimer une carte
 - `POST /api/battle_result` : Enregistrer résultat de bataille
+- `POST /api/register` : Créer un compte utilisateur
+- `POST /api/login` : Se connecter
+- `POST /api/logout` : Se déconnecter
+- `POST /api/save_game` : Sauvegarder une partie
+- `GET /api/load_game/<save_id>` : Charger une partie sauvegardée
+- `GET /api/saves` : Liste des sauvegardes de l'utilisateur
+- `DELETE /api/delete_save/<save_id>` : Supprimer une sauvegarde
+- `GET /api/stats` : Statistiques de l'utilisateur
+- `POST /api/save_game_stats` : Enregistrer les statistiques d'une partie
 
 ### Sécurité et robustesse
 - **Validation côté serveur** : Toutes les actions sont vérifiées
@@ -238,8 +260,8 @@ clashroyale/
 
 ### Feuille de route
 - [ ] Mode multijoueur en local
-- [ ] Sauvegarde des parties
-- [ ] Statistiques et historique
+- [x] Sauvegarde des parties
+- [x] Statistiques et historique
 - [ ] Mode tournoi
 - [ ] API publique pour extensions
 

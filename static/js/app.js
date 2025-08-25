@@ -888,10 +888,21 @@ function showNotification(message, type = 'info') {
     notification.className = `notification ${type}`;
     notification.textContent = message;
     
+    // Calculer la position verticale en fonction des toasts existants
+    const existingNotifications = document.querySelectorAll('.notification');
+    let topPosition = 20; // Position de base
+    
+    existingNotifications.forEach(existing => {
+        const rect = existing.getBoundingClientRect();
+        const currentTop = parseInt(existing.style.top) || 20;
+        const height = rect.height || 60; // hauteur estimée si pas encore mesurable
+        topPosition = Math.max(topPosition, currentTop + height + 10); // 10px d'espacement
+    });
+    
     // Ajouter les styles en ligne si pas dans le CSS
     notification.style.cssText = `
         position: fixed;
-        top: 20px;
+        top: ${topPosition}px;
         right: 20px;
         padding: 15px 20px;
         border-radius: 8px;
@@ -928,16 +939,31 @@ function showNotification(message, type = 'info') {
         notification.style.transform = 'translateX(0)';
     }, 100);
     
-    // Suppression automatique
+    // Suppression automatique avec réorganisation des autres toasts
     setTimeout(() => {
         notification.style.opacity = '0';
         notification.style.transform = 'translateX(100%)';
         setTimeout(() => {
             if (notification.parentNode) {
                 document.body.removeChild(notification);
+                // Réorganiser les toasts restants
+                reorganizeNotifications();
             }
         }, 300);
     }, 4000);
+}
+
+// Fonction pour réorganiser les notifications après suppression
+function reorganizeNotifications() {
+    const notifications = document.querySelectorAll('.notification');
+    let topPosition = 20;
+    
+    notifications.forEach(notification => {
+        notification.style.top = `${topPosition}px`;
+        const rect = notification.getBoundingClientRect();
+        const height = rect.height || 60;
+        topPosition += height + 10; // 10px d'espacement
+    });
 }
 
 // Afficher l'écran de fin de partie avec un design moderne
@@ -1131,22 +1157,8 @@ function showGameOver() {
 
 // Fonction pour afficher des erreurs avec style
 function showError(message, type = 'error') {
-    const errorElement = document.createElement('div');
-    errorElement.className = `error-toast ${type}`;
-    errorElement.textContent = message;
-    
-    // Ajouter au header pour visibilité
-    const header = document.querySelector('.header');
-    header.appendChild(errorElement);
-    
-    // Animation d'apparition
-    setTimeout(() => errorElement.classList.add('show'), 100);
-    
-    // Retirer après 3 secondes
-    setTimeout(() => {
-        errorElement.classList.remove('show');
-        setTimeout(() => header.removeChild(errorElement), 300);
-    }, 3000);
+    // Utiliser le même système que showNotification pour éviter la superposition
+    showNotification(message, type);
 }
 
 // Afficher les bonus de familles
@@ -2623,3 +2635,651 @@ setInterval(() => {
         updateGameDisplay();
     }
 }, 30000);
+
+// ===== GESTION DES COMPTES ET AUTHENTIFICATION =====
+
+// Variable pour stocker l'état de connexion
+let currentUser = null;
+
+// Vérifier la session au démarrage
+document.addEventListener('DOMContentLoaded', function() {
+    checkSession();
+});
+
+// Vérifier si l'utilisateur est connecté
+async function checkSession() {
+    try {
+        const response = await fetch('/api/check_session');
+        const data = await response.json();
+        
+        if (data.logged_in) {
+            currentUser = data.username;
+            updateUserInterface(true);
+        } else {
+            updateUserInterface(false);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la vérification de session:', error);
+        updateUserInterface(false);
+    }
+}
+
+// Mettre à jour l'interface utilisateur selon l'état de connexion
+function updateUserInterface(isLoggedIn) {
+    const loggedOut = document.getElementById('user-logged-out');
+    const loggedIn = document.getElementById('user-logged-in');
+    const usernameDisplay = document.getElementById('username-display');
+    
+    if (isLoggedIn && currentUser) {
+        loggedOut.style.display = 'none';
+        loggedIn.style.display = 'flex';
+        usernameDisplay.textContent = currentUser;
+    } else {
+        loggedOut.style.display = 'flex';
+        loggedIn.style.display = 'none';
+        currentUser = null;
+    }
+}
+
+// Afficher la modal de connexion
+function showLoginModal() {
+    const modal = document.getElementById('login-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Focus sur le champ username
+    setTimeout(() => {
+        document.getElementById('login-username').focus();
+    }, 100);
+}
+
+// Afficher la modal d'inscription
+function showRegisterModal() {
+    const modal = document.getElementById('register-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Focus sur le champ username
+    setTimeout(() => {
+        document.getElementById('register-username').focus();
+    }, 100);
+}
+
+// Connexion
+async function login(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    
+    if (!username || !password) {
+        showError('Veuillez remplir tous les champs');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentUser = data.username;
+            updateUserInterface(true);
+            closeModal('login-modal');
+            showNotification(data.message, 'success');
+            
+            // Réinitialiser le formulaire
+            document.getElementById('login-form').reset();
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la connexion:', error);
+        showError('Erreur de connexion');
+    }
+}
+
+// Inscription
+async function register(event) {
+    event.preventDefault();
+    
+    const username = document.getElementById('register-username').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    const confirm = document.getElementById('register-confirm').value;
+    
+    // Validations côté client
+    if (!username || !email || !password || !confirm) {
+        showError('Veuillez remplir tous les champs');
+        return;
+    }
+    
+    if (username.length < 3) {
+        showError('Le nom d\'utilisateur doit contenir au moins 3 caractères');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showError('Le mot de passe doit contenir au moins 6 caractères');
+        return;
+    }
+    
+    if (password !== confirm) {
+        showError('Les mots de passe ne correspondent pas');
+        return;
+    }
+    
+    if (!email.includes('@')) {
+        showError('Adresse email invalide');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentUser = data.username;
+            updateUserInterface(true);
+            closeModal('register-modal');
+            showNotification(data.message, 'success');
+            
+            // Réinitialiser le formulaire
+            document.getElementById('register-form').reset();
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'inscription:', error);
+        showError('Erreur d\'inscription');
+    }
+}
+
+// Déconnexion
+async function logout() {
+    try {
+        const response = await fetch('/api/logout', {
+            method: 'POST'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            currentUser = null;
+            updateUserInterface(false);
+            showNotification(data.message, 'success');
+            
+            // Fermer toutes les modals ouvertes
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.classList.remove('show');
+                modal.style.display = 'none';
+            });
+        }
+    } catch (error) {
+        console.error('Erreur lors de la déconnexion:', error);
+        showError('Erreur de déconnexion');
+    }
+}
+
+// ===== GESTION DES SAUVEGARDES =====
+
+// Afficher la modal des sauvegardes
+function showSavesModal() {
+    if (!currentUser) {
+        showError('Connexion requise pour accéder aux sauvegardes');
+        return;
+    }
+    
+    const modal = document.getElementById('saves-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Charger les sauvegardes
+    loadSaves();
+    
+    // Montrer/cacher le bouton de sauvegarde selon l'état du jeu
+    const saveCurrentBtn = document.getElementById('save-current-btn');
+    if (gameState.isConfigured && gameState.session) {
+        saveCurrentBtn.style.display = 'block';
+    } else {
+        saveCurrentBtn.style.display = 'none';
+    }
+}
+
+// Charger la liste des sauvegardes
+async function loadSaves() {
+    const savesList = document.getElementById('saves-list');
+    savesList.innerHTML = '<p class="loading">Chargement des sauvegardes...</p>';
+    
+    try {
+        const response = await fetch('/api/saves');
+        const data = await response.json();
+        
+        if (data.success) {
+            displaySaves(data.saves);
+        } else {
+            savesList.innerHTML = `<p class="error">${data.error}</p>`;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des sauvegardes:', error);
+        savesList.innerHTML = '<p class="error">Erreur lors du chargement</p>';
+    }
+}
+
+// Afficher la liste des sauvegardes
+function displaySaves(saves) {
+    const savesList = document.getElementById('saves-list');
+    
+    if (saves.length === 0) {
+        savesList.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-save"></i>
+                <p>Aucune sauvegarde trouvée</p>
+                <p>Démarrez une partie et sauvegardez-la pour qu'elle apparaisse ici.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const savesHtml = saves.map(save => {
+        const date = new Date(save.last_modified);
+        const formattedDate = date.toLocaleString('fr-FR');
+        const status = save.is_completed ? 'Terminée' : 'En cours';
+        const statusClass = save.is_completed ? 'completed' : 'in-progress';
+        
+        return `
+            <div class="save-item">
+                <div class="save-header">
+                    <div class="save-name">${save.game_name}</div>
+                    <div class="save-date">${formattedDate}</div>
+                </div>
+                <div class="save-info">
+                    <span><i class="fas fa-clock"></i> Tour ${save.tour}</span>
+                    <span><i class="fas fa-droplet"></i> ${save.elixir} élixir</span>
+                    <span><i class="fas fa-heart"></i> ${save.hp} HP</span>
+                    <span class="${statusClass}"><i class="fas fa-circle"></i> ${status}</span>
+                </div>
+                <div class="save-actions">
+                    <button class="btn btn-primary" onclick="loadGameFromSave('${save.save_id}')">
+                        <i class="fas fa-play"></i> Charger
+                    </button>
+                    ${!save.is_completed && gameState.isConfigured ? 
+                        `<button class="btn btn-secondary" onclick="updateExistingSave('${save.save_id}')">
+                            <i class="fas fa-save"></i> Mettre à jour
+                        </button>` : ''
+                    }
+                    <button class="btn btn-danger" onclick="deleteSave('${save.save_id}')">
+                        <i class="fas fa-trash"></i> Supprimer
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    savesList.innerHTML = savesHtml;
+}
+
+// Afficher la modal de sauvegarde
+function showSaveGameModal() {
+    if (!currentUser) {
+        showError('Connexion requise pour sauvegarder');
+        return;
+    }
+    
+    if (!gameState.isConfigured || !gameState.session) {
+        showError('Aucune partie active à sauvegarder');
+        return;
+    }
+    
+    const modal = document.getElementById('save-game-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Générer un nom par défaut
+    const now = new Date();
+    const defaultName = `Partie du ${now.toLocaleDateString('fr-FR')} ${now.toLocaleTimeString('fr-FR', {hour: '2-digit', minute: '2-digit'})}`;
+    document.getElementById('save-game-name').value = defaultName;
+    
+    setTimeout(() => {
+        document.getElementById('save-game-name').focus();
+        document.getElementById('save-game-name').select();
+    }, 100);
+}
+
+// Sauvegarder la partie actuelle
+async function saveCurrentGame(event) {
+    event.preventDefault();
+    
+    const gameName = document.getElementById('save-game-name').value.trim();
+    
+    if (!gameName) {
+        showError('Veuillez entrer un nom pour la sauvegarde');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/save_game', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ game_name: gameName })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            closeModal('save-game-modal');
+            showNotification(data.message, 'success');
+            
+            // Actualiser la liste des sauvegardes si elle est ouverte
+            if (document.getElementById('saves-modal').classList.contains('show')) {
+                loadSaves();
+            }
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        showError('Erreur lors de la sauvegarde');
+    }
+}
+
+// Charger une partie depuis une sauvegarde
+async function loadGameFromSave(saveId) {
+    try {
+        const response = await fetch(`/api/load_game/${saveId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Mettre à jour l'état du jeu
+            gameState.session = data.session_id;
+            gameState.isConfigured = true;
+            
+            // Fermer les modals
+            closeModal('saves-modal');
+            
+            // Afficher l'interface de jeu
+            showGameInterface();
+            
+            // Mettre à jour l'affichage
+            await updateGameDisplay();
+            
+            showNotification(data.message, 'success');
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement:', error);
+        showError('Erreur lors du chargement de la sauvegarde');
+    }
+}
+
+// Mettre à jour une sauvegarde existante
+async function updateExistingSave(saveId) {
+    try {
+        const response = await fetch(`/api/update_save/${saveId}`, {
+            method: 'PUT'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadSaves(); // Actualiser la liste
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la mise à jour:', error);
+        showError('Erreur lors de la mise à jour de la sauvegarde');
+    }
+}
+
+// Supprimer une sauvegarde
+async function deleteSave(saveId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette sauvegarde ?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/delete_save/${saveId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showNotification(data.message, 'success');
+            loadSaves(); // Actualiser la liste
+        } else {
+            showError(data.error);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        showError('Erreur lors de la suppression');
+    }
+}
+
+// ===== GESTION DES STATISTIQUES =====
+
+// Afficher la modal des statistiques
+function showStatsModal() {
+    if (!currentUser) {
+        showError('Connexion requise pour accéder aux statistiques');
+        return;
+    }
+    
+    const modal = document.getElementById('stats-modal');
+    modal.classList.add('show');
+    modal.style.display = 'flex';
+    
+    // Charger les statistiques
+    loadStats();
+}
+
+// Charger les statistiques
+async function loadStats() {
+    const statsContainer = document.getElementById('stats-container');
+    statsContainer.innerHTML = '<p class="loading">Chargement des statistiques...</p>';
+    
+    try {
+        const response = await fetch('/api/stats');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayStats(data.stats);
+        } else {
+            statsContainer.innerHTML = `<p class="error">${data.error}</p>`;
+        }
+    } catch (error) {
+        console.error('Erreur lors du chargement des statistiques:', error);
+        statsContainer.innerHTML = '<p class="error">Erreur lors du chargement</p>';
+    }
+}
+
+// Afficher les statistiques
+function displayStats(stats) {
+    const statsContainer = document.getElementById('stats-container');
+    
+    if (stats.total_games === 0) {
+        statsContainer.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-chart-bar"></i>
+                <p>Aucune statistique disponible</p>
+                <p>Jouez quelques parties pour voir vos statistiques ici.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const statsHtml = `
+        <div class="stats-overview">
+            <div class="stat-card">
+                <h4>Parties jouées</h4>
+                <div class="stat-value">${stats.total_games}</div>
+                <div class="stat-unit">parties</div>
+            </div>
+            <div class="stat-card">
+                <h4>Taux de victoire</h4>
+                <div class="stat-value">${stats.win_rate}</div>
+                <div class="stat-unit">%</div>
+            </div>
+            <div class="stat-card">
+                <h4>Meilleur tour</h4>
+                <div class="stat-value">${stats.best_tour}</div>
+                <div class="stat-unit">tour</div>
+            </div>
+            <div class="stat-card">
+                <h4>Tour moyen</h4>
+                <div class="stat-value">${stats.average_tour}</div>
+                <div class="stat-unit">tour</div>
+            </div>
+            <div class="stat-card">
+                <h4>Élixir total</h4>
+                <div class="stat-value">${stats.total_elixir}</div>
+                <div class="stat-unit">élixir</div>
+            </div>
+            <div class="stat-card">
+                <h4>Fusions totales</h4>
+                <div class="stat-value">${stats.total_fusions}</div>
+                <div class="stat-unit">fusions</div>
+            </div>
+        </div>
+        
+        ${stats.favorite_leader ? `
+            <div class="stats-overview">
+                <div class="stat-card">
+                    <h4>Leader favori</h4>
+                    <div class="stat-value" style="font-size: 1.2rem;">${stats.favorite_leader}</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Modificateur favori</h4>
+                    <div class="stat-value" style="font-size: 1rem;">${stats.favorite_modificateur}</div>
+                </div>
+            </div>
+        ` : ''}
+        
+        ${stats.recent_games.length > 0 ? `
+            <div class="recent-games">
+                <h4><i class="fas fa-clock"></i> Parties récentes</h4>
+                ${stats.recent_games.map(game => {
+                    const date = new Date(game.date);
+                    const formattedDate = date.toLocaleDateString('fr-FR');
+                    const resultClass = game.victoire ? 'victory' : 'defeat';
+                    const resultText = game.victoire ? 'Victoire' : 'Défaite';
+                    
+                    return `
+                        <div class="recent-game ${resultClass}">
+                            <div class="game-info-left">
+                                <span class="game-result ${resultClass}">${resultText}</span>
+                                <span class="game-details">
+                                    Tour ${game.tour_final} • ${game.leader_utilise}
+                                </span>
+                            </div>
+                            <span class="game-date">${formattedDate}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        ` : ''}
+    `;
+    
+    statsContainer.innerHTML = statsHtml;
+}
+
+// ===== UTILITAIRES MODALS =====
+
+// Fermer une modal (version améliorée)
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 200);
+    }
+}
+
+// Fermer les modals en cliquant à l'extérieur
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal')) {
+        const modal = e.target;
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 200);
+    }
+});
+
+// Raccourcis clavier pour les modals
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // Fermer toutes les modals ouvertes
+        document.querySelectorAll('.modal.show').forEach(modal => {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 200);
+        });
+    }
+});
+
+// Sauvegarde automatique des statistiques à la fin de partie
+const originalRecordBattleResult = recordBattleResult;
+recordBattleResult = async function(victoire) {
+    // Appeler la fonction originale
+    const result = await originalRecordBattleResult(victoire);
+    
+    // Si l'utilisateur est connecté, sauvegarder les stats
+    if (currentUser && gameState.session) {
+        try {
+            // Récupérer l'état actuel du jeu pour les statistiques
+            const gameStateResponse = await fetch(`/api/game_state/${gameState.session}`);
+            const gameStateData = await gameStateResponse.json();
+            
+            if (gameStateData.success) {
+                const stats = {
+                    tour_final: gameStateData.state.tour,
+                    elixir_total_gagne: gameStateData.state.elixir,
+                    cartes_achetees: 0, // TODO: tracker cela pendant le jeu
+                    fusions_effectuees: 0, // TODO: tracker cela pendant le jeu
+                    cartes_vendues: 0, // TODO: tracker cela pendant le jeu
+                    bonus_familles_utilises: Object.keys(gameStateData.state.bonus_familles).filter(famille => 
+                        gameStateData.state.bonus_familles[famille].actif
+                    ),
+                    leader_utilise: gameStateData.state.leader?.nom || '',
+                    modificateur_utilise: gameStateData.state.modificateurs_actifs[0] || '',
+                    victoire: victoire,
+                    troupes_adverses_restantes: victoire ? 0 : 10, // TODO: obtenir la vraie valeur
+                    duree_partie_minutes: 0 // TODO: tracker la durée
+                };
+                
+                await fetch('/api/save_game_stats', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(stats)
+                });
+            }
+        } catch (error) {
+            console.error('Erreur lors de la sauvegarde des statistiques:', error);
+        }
+    }
+    
+    return result;
+};

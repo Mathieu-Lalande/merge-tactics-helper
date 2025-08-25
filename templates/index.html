@@ -13,6 +13,7 @@
         <header class="header">
             <div class="header-content">
                 <h1><i class="fas fa-crown"></i> Clash Royale Merge Tactics Assistant</h1>
+                
                 <div class="game-info">
                     <div class="elixir-counter">
                         <i class="fas fa-droplet"></i>
@@ -31,6 +32,35 @@
                         <div class="stat-item">
                             <i class="fas fa-heart"></i> 
                             <span id="hp-display">10</span> HP
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Account Section -->
+                <div class="user-section" id="user-section">
+                    <div class="user-logged-out" id="user-logged-out">
+                        <button class="btn btn-secondary btn-sm" onclick="showLoginModal()">
+                            <i class="fas fa-sign-in-alt"></i> Connexion
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="showRegisterModal()">
+                            <i class="fas fa-user-plus"></i> Inscription
+                        </button>
+                    </div>
+                    <div class="user-logged-in" id="user-logged-in" style="display: none;">
+                        <div class="user-info">
+                            <i class="fas fa-user"></i>
+                            <span id="username-display"></span>
+                        </div>
+                        <div class="user-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="showSavesModal()">
+                                <i class="fas fa-save"></i> Sauvegardes
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="showStatsModal()">
+                                <i class="fas fa-chart-bar"></i> Stats
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="logout()">
+                                <i class="fas fa-sign-out-alt"></i> Déconnexion
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -287,6 +317,147 @@
                 </div>
                 <div class="modal-body">
                     <div id="card-library" class="card-library"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modals pour la gestion des comptes et sauvegardes -->
+        
+        <!-- Modal de connexion -->
+        <div id="login-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-sign-in-alt"></i> Connexion</h3>
+                    <button class="close-modal" onclick="closeModal('login-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="login-form" onsubmit="login(event)">
+                        <div class="form-group">
+                            <label for="login-username">Nom d'utilisateur :</label>
+                            <input type="text" id="login-username" name="username" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Mot de passe :</label>
+                            <input type="password" id="login-password" name="password" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt"></i> Se connecter
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal d'inscription -->
+        <div id="register-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-user-plus"></i> Inscription</h3>
+                    <button class="close-modal" onclick="closeModal('register-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="register-form" onsubmit="register(event)">
+                        <div class="form-group">
+                            <label for="register-username">Nom d'utilisateur :</label>
+                            <input type="text" id="register-username" name="username" required minlength="3">
+                            <small>Au moins 3 caractères</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-email">Adresse email :</label>
+                            <input type="email" id="register-email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-password">Mot de passe :</label>
+                            <input type="password" id="register-password" name="password" required minlength="6">
+                            <small>Au moins 6 caractères</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="register-confirm">Confirmer le mot de passe :</label>
+                            <input type="password" id="register-confirm" name="confirm" required minlength="6">
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus"></i> S'inscrire
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal des sauvegardes -->
+        <div id="saves-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3><i class="fas fa-save"></i> Gestion des sauvegardes</h3>
+                    <button class="close-modal" onclick="closeModal('saves-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="saves-actions">
+                        <button class="btn btn-primary" onclick="showSaveGameModal()" id="save-current-btn">
+                            <i class="fas fa-save"></i> Sauvegarder la partie actuelle
+                        </button>
+                        <button class="btn btn-secondary" onclick="loadSaves()">
+                            <i class="fas fa-refresh"></i> Actualiser
+                        </button>
+                    </div>
+                    <div class="saves-list" id="saves-list">
+                        <p class="loading">Chargement des sauvegardes...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal de sauvegarde de partie -->
+        <div id="save-game-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-save"></i> Sauvegarder la partie</h3>
+                    <button class="close-modal" onclick="closeModal('save-game-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="save-game-form" onsubmit="saveCurrentGame(event)">
+                        <div class="form-group">
+                            <label for="save-game-name">Nom de la sauvegarde :</label>
+                            <input type="text" id="save-game-name" name="game_name" 
+                                   placeholder="Ma partie du 25/08/2025" required>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Sauvegarder
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="closeModal('save-game-modal')">
+                                Annuler
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Modal des statistiques -->
+        <div id="stats-modal" class="modal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3><i class="fas fa-chart-bar"></i> Statistiques</h3>
+                    <button class="close-modal" onclick="closeModal('stats-modal')">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="stats-container" id="stats-container">
+                        <p class="loading">Chargement des statistiques...</p>
+                    </div>
                 </div>
             </div>
         </div>

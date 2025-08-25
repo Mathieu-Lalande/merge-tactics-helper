@@ -61,3 +61,37 @@ instance/
 # Temporary files
 *.tmp
 *.temp
+
+# Flask session files
+flask_session/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Node.js (si vous ajoutez du frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.bak
+*.backup
+
+# Sensitive data files (important pour votre app)
+data/accounts.json
+data/saved_games.json
+data/game_stats.json
+
+# Cache directories
+.cache/
+.parcel-cache/
