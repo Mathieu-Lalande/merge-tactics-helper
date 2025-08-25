@@ -519,7 +519,7 @@ input:focus, select:focus {
 /* Game Interface */
 .game-interface {
     display: grid;
-    grid-template-columns: 1fr 400px;
+    grid-template-columns: 1fr 500px;
     gap: 2rem;
     margin: 0 auto;
 }
@@ -930,32 +930,18 @@ input:focus, select:focus {
 }
 
 .quick-card-level {
-    display: flex;
-    gap: 0.4rem;
+    display: none; /* Supprimé - plus de sélection de niveau */
+}
+
+.quick-card-family {
+    text-align: center;
     margin-bottom: 0.8rem;
-    justify-content: center;
-}
-
-.level-btn {
-    width: 35px;
-    height: 35px;
-    border: 2px solid var(--gray);
-    background: white;
+    padding: 0.4rem;
+    background: var(--light-gray);
+    color: var(--dark-gray);
     border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: 1rem;
-    transition: all 0.2s ease;
-}
-
-.level-btn:hover, .level-btn.selected {
-    border-color: var(--primary-blue);
-    background: var(--primary-blue);
-    color: white;
-    transform: scale(1.1);
+    font-size: 0.9rem;
+    font-weight: 600;
 }
 
 .quick-card-families {

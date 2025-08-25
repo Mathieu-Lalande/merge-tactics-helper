@@ -295,39 +295,69 @@ function showGameInterface() {
 }
 
 // === SYSTÈME D'ACHAT RAPIDE ===
+// Variable pour suivre le dernier tour et éviter les régénérations inutiles
+let lastQuickCardsTour = 0;
+// Variable pour stocker les cartes actuellement affichées
+let currentQuickCards = [];
+
 // Initialiser le mode achat rapide
 function initializeQuickBuy() {
     generateQuickCards();
 }
 
-// Générer les cartes communes pour l'achat rapide - VERSION SIMPLIFIÉE
+// Générer des cartes aléatoires pour l'achat rapide - NOUVELLE VERSION
 function generateQuickCards() {
     if (!cardsData || Object.keys(cardsData).length === 0) {
         setTimeout(generateQuickCards, 500);
         return;
     }
     
+    // Vérifier si on doit régénérer (nouveau tour uniquement)
+    const currentTour = parseInt(document.getElementById('tour-count')?.textContent) || 1;
+    
+    // Si on a déjà des cartes pour ce tour, juste mettre à jour l'affordabilité
+    if (currentTour === lastQuickCardsTour && currentQuickCards.length > 0) {
+        console.log(`🔄 Tour ${currentTour}: Mise à jour affordabilité seulement`);
+        updateQuickCardsAffordability();
+        return;
+    }
+    
+    console.log(`🎲 Tour ${currentTour}: Génération de nouvelles cartes rapides`);
+    
     const container = document.getElementById('quick-cards-grid');
     container.innerHTML = '';
     
-    // Sélectionner SEULEMENT 4 cartes les plus populaires (2x2 grid)
-    const popularCards = [
-        'Chevalier',    // Coût 2, Noble/Colosse
-        'Gobelins',     // Coût 2, Gobelin/Assassin  
-        'Prince',       // Coût 3, Noble/Bagarreur
-        'P.E.K.K.A'         // Coût 3, Ace/Colosse
-    ];
+    // Sélectionner 4 cartes ALÉATOIRES de la bibliothèque
+    const allCardNames = Object.keys(cardsData);
+    const selectedCards = [];
     
-    popularCards.forEach(cardName => {
+    // Créer une copie pour éviter les doublons
+    const availableCards = [...allCardNames];
+    
+    // Sélectionner 4 cartes différentes aléatoirement
+    for (let i = 0; i < 4 && availableCards.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * availableCards.length);
+        const selectedCard = availableCards.splice(randomIndex, 1)[0];
+        selectedCards.push(selectedCard);
+    }
+    
+    // Stocker les cartes sélectionnées
+    currentQuickCards = [...selectedCards];
+    
+    // Créer les cartes rapides
+    selectedCards.forEach(cardName => {
         const cardData = cardsData[cardName];
         if (cardData) {
             const quickCard = createQuickCard(cardName, cardData);
             container.appendChild(quickCard);
         }
     });
+    
+    // Mettre à jour le tour de dernière génération
+    lastQuickCardsTour = currentTour;
 }
 
-// Créer une carte rapide - VERSION SIMPLIFIÉE
+// Créer une carte rapide - VERSION SIMPLIFIÉE NIVEAU 1 UNIQUEMENT
 function createQuickCard(cardKey, cardData) {
     const currentElixir = parseInt(document.getElementById('elixir-count')?.textContent) || 0;
     const canAfford = cardData.cout_elixir <= currentElixir;
@@ -335,7 +365,6 @@ function createQuickCard(cardKey, cardData) {
     const cardDiv = document.createElement('div');
     cardDiv.className = `quick-card ${canAfford ? 'affordable' : 'expensive'}`;
     cardDiv.dataset.cardKey = cardKey;
-    cardDiv.dataset.selectedLevel = '1';
     
     cardDiv.innerHTML = `
         <div class="quick-card-header">
@@ -343,51 +372,51 @@ function createQuickCard(cardKey, cardData) {
             <div class="quick-card-cost">${cardData.cout_elixir}⚡</div>
         </div>
         
-        <div class="quick-card-level">
-            ${[1, 2, 3].map(level => `
-                <button class="level-btn ${level === 1 ? 'selected' : ''}" 
-                        onclick="selectQuickLevel('${cardKey}', ${level})">${level}</button>
-            `).join('')}
+        <div class="quick-card-family">
+            ${cardData.famille}
         </div>
         
         <button class="quick-buy-btn" 
                 onclick="quickBuyCard('${cardKey}')" 
                 ${!canAfford ? 'disabled' : ''}>
-            ${canAfford ? 'Acheter' : 'Trop cher'}
+            ${canAfford ? 'Acheter Niv. 1' : 'Trop cher'}
         </button>
     `;
     
     return cardDiv;
 }
 
-// Sélectionner le niveau pour l'achat rapide
-function selectQuickLevel(cardKey, level) {
-    const cardElement = document.querySelector(`[data-card-key="${cardKey}"]`);
-    if (!cardElement) return;
+// Mettre à jour uniquement l'affordabilité des cartes rapides
+function updateQuickCardsAffordability() {
+    const currentElixir = parseInt(document.getElementById('elixir-count')?.textContent) || 0;
+    const quickCards = document.querySelectorAll('.quick-card');
     
-    // Mettre à jour le niveau sélectionné
-    cardElement.dataset.selectedLevel = level;
-    
-    // Mettre à jour l'affichage des boutons de niveau
-    const levelBtns = cardElement.querySelectorAll('.level-btn');
-    levelBtns.forEach((btn, index) => {
-        if (index + 1 === level) {
-            btn.classList.add('selected');
-        } else {
-            btn.classList.remove('selected');
-        }
+    quickCards.forEach(cardElement => {
+        const cardKey = cardElement.dataset.cardKey;
+        const cardData = cardsData[cardKey];
+        if (!cardData) return;
+        
+        const canAfford = cardData.cout_elixir <= currentElixir;
+        const buyBtn = cardElement.querySelector('.quick-buy-btn');
+        
+        // Mettre à jour la classe CSS
+        cardElement.className = `quick-card ${canAfford ? 'affordable' : 'expensive'}`;
+        
+        // Mettre à jour le bouton
+        buyBtn.disabled = !canAfford;
+        buyBtn.textContent = canAfford ? 'Acheter Niv. 1' : 'Trop cher';
     });
 }
 
-// Achat rapide d'une carte
+// Achat rapide d'une carte - NIVEAU 1 UNIQUEMENT
 async function quickBuyCard(cardKey) {
     if (!gameState.session) {
         showNotification('Session de jeu non initialisée.', 'error');
         return;
     }
     
-    const cardElement = document.querySelector(`[data-card-key="${cardKey}"]`);
-    const level = parseInt(cardElement.dataset.selectedLevel) || 1;
+    // Toujours niveau 1 pour l'achat rapide
+    const level = 1;
     
     try {
         const response = await fetch('/api/buy_card', {
@@ -429,8 +458,8 @@ async function quickBuyCard(cardKey) {
             // Actualiser l'état du jeu
             await updateGameDisplay();
             
-            // Regenerer les cartes rapides avec le nouvel élixir
-            setTimeout(generateQuickCards, 500);
+            // Note: updateGameDisplay() se charge déjà de mettre à jour l'affordabilité
+            // des cartes rapides sans les régénérer si le tour n'a pas changé
             
         } else {
             showNotification(data.error || 'Erreur lors de l\'achat', 'error');
@@ -443,8 +472,11 @@ async function quickBuyCard(cardKey) {
 
 // Actualiser les cartes rapides
 function refreshQuickCards() {
+    // Forcer une nouvelle génération en réinitialisant les variables
+    lastQuickCardsTour = 0;
+    currentQuickCards = [];
     generateQuickCards();
-    showNotification('Cartes actualisées !', 'info');
+    showNotification('Nouvelles cartes générées !', 'info');
 }
 
 // Basculer entre mode rapide et avancé
@@ -486,6 +518,10 @@ async function updateGameDisplay() {
         
         if (data.success) {
             const state = data.state;
+            
+            // Stocker l'ancien tour pour détecter les changements
+            const oldTour = parseInt(document.getElementById('tour-count')?.textContent) || 0;
+            const newTour = state.tour;
             
             // Mettre à jour les compteurs
             document.getElementById('elixir-count').textContent = state.elixir;
@@ -534,6 +570,15 @@ async function updateGameDisplay() {
             
             // Mettre à jour le plateau hexagonal
             updateGameBoardDisplay(state);
+            
+            // Régénérer les cartes rapides SEULEMENT si le tour a changé
+            if (newTour > oldTour) {
+                console.log(`🔄 Nouveau tour détecté: ${oldTour} → ${newTour}, régénération des cartes rapides`);
+                generateQuickCards();
+            } else {
+                // Sinon, juste mettre à jour l'affordabilité
+                updateQuickCardsAffordability();
+            }
             
         } else {
             console.error('Erreur lors de la récupération de l\'état:', data.error);
